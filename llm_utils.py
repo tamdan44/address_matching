@@ -14,13 +14,15 @@ def get_llm_address(llm, input_address: str):
     prompt = PromptTemplate(
         input_variables=["input_address"],
         template='''You are an expert in address matching. Extract and return a JSON object with the address components.  
-All of the addresses are in either Vietnam, Philipines or Thailand, so they might be written in the languages of those countries.
-        
+All of the addresses belong to either Vietnam, Philipines or Thailand. The input address is usually in English or Vietnamese.
+
 ### Instruction:
-- ad1 (first-level aministrative devision) might include tỉnh, thành phố trực thuộc trung ương, จังหวัด, กรุงเทพมหานคร, lalawigan/probinsya, NCR, etc.
-- ad2 (second-level aministrative devision) might include quận, huyện, thành phố trực thuộc tỉnh, thị xã, อำเภอ, bayan, lungsod, etc.
-- ad3 (second-level aministrative devision) might include phường, xã, thị trấn, ตำบล, เขต, barangay, etc.
-- ad2 (second-level aministrative devision) might include thôn, ấp, làng, khu phố,
+- The country_code are: "vn" for Vietnam, "ph" for the Philipines and "th" for Thailand.
+- ad1 (first-level aministrative devision) might include tỉnh, thành phố (trực thuộc trung ương), province, region, NCR, etc.
+- ad2 (second-level aministrative devision) might include quận, huyện, thành phố (trực thuộc tỉnh), thị xã, district, municipality, city, etc.
+- ad3 (second-level aministrative devision) might include phường, xã, thị trấn, subdistrict, ward, barangay, etc.
+- ad2 (second-level aministrative devision) might include thôn, ấp, làng, khu phố, village, community, zone, hamlet, etc. 
+
 
 ### Example:
 - Input: 18a Nguyễn Văn Cừ, P. 4, Q. 5, TP. HCM
@@ -30,9 +32,9 @@ All of the addresses are in either Vietnam, Philipines or Thailand, so they migh
 "street": "18a Đường Nguyễn Văn Cừ",
 "ad4": "",
 "ad3": "Phường 4",
-"ad2": "QUuận 5",
+"ad2": "Quận 5",
 "ad1": "Thành phố Hồ Chí Minh",
-"country": "Vietnam"
+"country_code": "vn"
 }}
 
 - Input2: trường THCS Võ Thị Sáu Tổ 01 Xã Tà Năng Lâm Đồng
@@ -44,63 +46,45 @@ All of the addresses are in either Vietnam, Philipines or Thailand, so they migh
 "ad3": "Xã Tà Năng",
 "ad2": "",
 "ad1": "Lâm Đồng",
+"country_code": "vn"
 }}
 
-- Input3: 79 Nguyen Cong Trứ
+- Input3: Barangay San Isidro, General Santos City, South Cotabato
 - Output3:
 {{
-"Cơ sở": "",
-"Đường": "79 Nguyen Cong Trứ",
-"Phường": "",
-"Xã": "",
-"Quận": "",
-"Huyện": "",
-"Thành phố": "",
-"Tỉnh": "",
-"Deliverable": "No"
+"amenity": "",
+"street": "",
+"ad4": "",
+"ad3": "Barangay San Isidro",
+"ad2": "General Santos City, South Cotabato",
+"ad1": "",
+"country_code": "ph"
 }}
 
 
 - Input4: Sản Hai1xa Phuo Định Huyện Thh
 - Output4:
 {{
-"Cơ sở": "Sản Hai1xa Phuo Định",
-"Đường": "",
-"Phường": "",
-"Xã": "",
-"Quận": "",
-"Huyện": "Thh",
-"Thành phố": "",
-"Tỉnh": "",
-"Deliverable": "No"
+"amenity": "Sản Hai1",
+"street": "",
+"ad4": "",
+"ad3": "xa Phuo Định",
+"ad2": "Huyện Thh",
+"ad1": "",
+"country_code": "vn"
 }}
 
 ### Input: {input_address}
 
 ### Output:
 Ensure the output is a valid JSON object with:
-- "Cơ sở"
-- "Đường"
-- "Phường"
-- "Xã"
-- "Quận"
-- "Huyện"
-- "Thành phố"
-- "Tỉnh"
-- "Deliverable"
-
-If the address is not deliverable, return:
-{{
-"Cơ sở": "",
-"Đường": "",
-"Phường": "",
-"Xã": "",
-"Quận": "",
-"Huyện": "",
-"Thành phố": "",
-"Tỉnh": "",
-"Deliverable": "No"
-}}
+- "amenity"
+- "street"
+- "ad4"
+- "ad3"
+- "ad2"
+- "ad1"
+- "country_code"
 '''
     )
 
@@ -110,4 +94,4 @@ If the address is not deliverable, return:
         address_data = json.loads(response.content.strip('```json\n').strip('```'))
         return address_data
     except json.JSONDecodeError:
-        return {"Error": "Invalid JSON response from LLM"}
+        return {"error": "Invalid JSON response from LLM"}

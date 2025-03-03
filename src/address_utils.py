@@ -186,7 +186,6 @@ class AddressMatcher:
     @staticmethod
     def find_index(dict_list: list[dict], query: str):
         """Tìm index của query trong list of dictionary."""
-        print(dict_list)
         name_list = [x['name'] for x in dict_list]
         query = query.strip()
         for i, name in enumerate(name_list):

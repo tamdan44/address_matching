@@ -5,7 +5,7 @@ import json
 from llm_utils import get_llm_address
 from unidecode import unidecode
 
-class AddressUtils:
+class AddressMatcher:
     def __init__(self, user_agent="YourApp/1.0", country_codes=['vn', 'ph', 'th']):
         self.base_url = "https://nominatim.openstreetmap.org/search"
         self.headers = {"User-Agent": user_agent}
@@ -56,11 +56,11 @@ class AddressUtils:
         return None
 
 
-    def format_address(self, structured_address: dict, full=False, drop=["amenity", "street", "country_code"]):
+    def format_address(self, structured_address: dict, drop=["amenity", "street", "country_code"]):
         if isinstance(structured_address, str):
             return structured_address
         filtered_items = {k: v for k, v in structured_address.items() if v!=''}
-        return ", ".join([v for k, v in filtered_items.items() if full or k not in drop])
+        return ", ".join([v for k, v in filtered_items.items() if k not in drop])
 
     def is_deliverable(self, structured_address: dict, hard_check=False):
         """Check if address is deliverable."""
@@ -103,7 +103,8 @@ class AddressUtils:
             # OpenStreetMap
         if len(llm_items)<=3:
             print(1)
-            osm_address = self.get_osm_address(self.format_address(llm_address, full=True))
+            formatted_address = self.format_address(llm_address, drop=[])
+            osm_address = self.get_osm_address(formatted_address) or self.get_osm_address(formatted_address.lower().replace('city', '').replace('barangay', ''))
             if self.is_madeup_address(llm_address, osm_address):
                 osm_address = None
         else:
@@ -113,7 +114,9 @@ class AddressUtils:
             print(2)
             if not self.is_deliverable(llm_address, hard_check=True):
                 return {'error': 'Address not found. Please try again.'}
-            osm_address = self.get_osm_address(self.format_address(llm_address, drop=dropped)) 
+            formatted_address = self.format_address(llm_address, drop=dropped)
+            print(formatted_address)
+            osm_address = self.get_osm_address(formatted_address) or self.get_osm_address(formatted_address.lower().replace('city', '').replace('barangay', ''))
             if osm_address and self.is_madeup_address(llm_address, osm_address):
                 print('madeup')
                 osm_address = None
@@ -150,7 +153,7 @@ class AddressUtils:
         for x in dropped:
             if x in llm_items:
                 output_address += llm_address.get(x, "").strip() + ", "
-        output_address += self.format_address(osm_address, full=True)
+        output_address += self.format_address(osm_address, drop=[])
 
         return {'address': output_address}
 

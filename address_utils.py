@@ -28,9 +28,9 @@ class AddressMatcher:
             data = response.json()[0]["address"]
             print(data)
             if data['country_code'] not in self.country_codes:
-                return None
+                return None, None
 
-            structured_address = {
+            address = {
                 "amenity": data.get("amenity", data.get('neighbourhood', data.get('tourism', ''))),
 
                 "street": " ".join(filter(
@@ -52,8 +52,8 @@ class AddressMatcher:
                     )),
                 "country": data.get("country", "")
             }
-            return structured_address
-        return None
+            return address, data
+        return None, None
 
 
     def format_address(self, structured_address: dict, drop=["amenity", "street", "country_code"]):
@@ -85,7 +85,7 @@ class AddressMatcher:
         """Trả về địa chỉ output, kết hợp OpenStreetMap và LLM."""
 
         input_address = " ".join(input_address.split())
-        dropped = ["amenity", "street", "country_code"]
+        dropped = ["amenity", "country_code"]
 
         # LLM
         llm_address = get_llm_address(llm, input_address)
@@ -100,14 +100,9 @@ class AddressMatcher:
 
         llm_items = {k: v for k, v in llm_address.items() if v!=''}
 
-            # OpenStreetMap
-        if len(llm_items)<=3:
-            print(1)
-            formatted_address = self.format_address(llm_address, drop=[])
-            osm_address = self.get_osm_address(formatted_address) or self.get_osm_address(formatted_address.lower().replace('city', '').replace('barangay', ''))
-            if self.is_madeup_address(llm_address, osm_address):
-                osm_address = None
-        else:
+        # OpenStreetMap
+        osm_address, structured_address = self.get_osm_address(self.format_address(llm_address, drop=[]))
+        if self.is_madeup_address(llm_address, osm_address):
             osm_address = None
             
         if not osm_address:
@@ -115,17 +110,15 @@ class AddressMatcher:
             if not self.is_deliverable(llm_address, hard_check=True):
                 return {'error': 'Address not found. Please try again.'}
             formatted_address = self.format_address(llm_address, drop=dropped)
-            print(formatted_address)
-            osm_address = self.get_osm_address(formatted_address) or self.get_osm_address(formatted_address.lower().replace('city', '').replace('barangay', ''))
+            osm_address, structured_address = self.get_osm_address(formatted_address) or self.get_osm_address(formatted_address.lower().replace('city', '').replace('barangay', ''))
             if osm_address and self.is_madeup_address(llm_address, osm_address):
-                print('madeup')
                 osm_address = None
 
-        for drop_key in ["ad4", "ad3"]:
+        for drop_key in ["street", "ad4", "ad3"]:
             if not osm_address:
                 print(3)
                 dropped.append(drop_key)
-                osm_address = self.get_osm_address(self.format_address(llm_address, drop=dropped))
+                osm_address, structured_address = self.get_osm_address(self.format_address(llm_address, drop=dropped))
                 if osm_address and self.is_madeup_address(llm_address, osm_address):
                     osm_address = None
                 else:
@@ -133,7 +126,7 @@ class AddressMatcher:
 
         if not osm_address:
             print(4)
-            osm_address = self.get_osm_address(input_address)
+            osm_address, structured_address = self.get_osm_address(input_address)
             if osm_address and not self.is_madeup_address(llm_address, osm_address):
                 if self.is_madeup_address(llm_address, osm_address):
                     return {'error': 'The address is not clear enough for delivery. Please add more details.'}
@@ -142,7 +135,7 @@ class AddressMatcher:
                 house_number = re.search(r'\b\d+[A-Za-z]?([\/-]\d+)*\b', input_address)
                 if house_number and house_number not in output_address:
                     output_address = house_number + ', ' + output_address
-                return {'address': output_address}
+                return {'address': output_address, 'structured_address':structured_address}
             
         if not osm_address:
             return {'error': 'Address not found. Please try again.'}
@@ -155,9 +148,9 @@ class AddressMatcher:
                 output_address += llm_address.get(x, "").strip() + ", "
         output_address += self.format_address(osm_address, drop=[])
 
-        return {'address': output_address}
+        return {'address': output_address, 'structured_address': structured_address}
 
-    def get_id(self, structured_address: dict):
+    def get_vn_address_id(self, structured_address: dict):
         try:
             with open('VietnamAdministrativeDivisions.json', 'r', encoding='utf_8') as file:
                 ad_dict = json.load(file)

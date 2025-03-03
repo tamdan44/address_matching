@@ -1,10 +1,10 @@
-from address_utils import AddressUtils
+from address_utils import AddressMatcher
 import pandas as pd
 from dotenv import load_dotenv
 from llm_utils import load_llm
 import os
 
-utils = AddressUtils()
+matcher = AddressMatcher()
 # test cases 
 with open('test_cases.txt', 'r', encoding='utf_8') as file:
     text = file.readlines()
@@ -21,17 +21,14 @@ df.drop_duplicates()
 load_dotenv()
 llm = load_llm(os.getenv("OPENAI_API_KEY"), 0, "gpt-4-turbo-preview")
 
-ai_address = [utils.get_output_address(llm, x) for x in customer_address]
+ai_address = [matcher.get_output_address(llm, x) for x in customer_address]
 
     # process output
-new_address = [x.get('address', None) if isinstance(x, dict) else None for x in ai_address]
-error = [x.get('error', None) if isinstance(x, dict) else None for x in ai_address]
-
+new_address = [x.get('address', x.get('error', None)) if isinstance(x, dict) else None for x in ai_address]
 df['New AI'] = new_address
-df['Error'] = error
 
 
-ids = [utils.get_id(new_address[x]) for x in range(len(new_address))]
+ids = [matcher.get_address_id(new_address[x]) for x in range(len(new_address))]
 df['ID'] = ids
 
 # df = pd.DataFrame({'New AI': new_address, 'Error': error})

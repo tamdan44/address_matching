@@ -20,14 +20,15 @@ class AddressInput(BaseModel):
 # Endpoints
 @app.post("/get_address")
 def get_address(input_data: AddressInput):
-    return matcher.get_output_address(llm, input_data.user_input)
+    structured_address = matcher.get_output_address(llm, input_data.user_input)
+    return structured_address
 
 @app.post("/get_address_id")
-def get_address_id(input_data: AddressInput):
-    structured_address = matcher.get_output_address(llm, input_data.user_input)
+def get_vn_address_id(input_data: AddressInput):
+    structured_address = get_address(input_data)
     if 'error' in structured_address.keys():
         return structured_address
-    return matcher.get_address_id(structured_address['address'])
+    return matcher.get_vn_address_id(structured_address['address'])
 
 
 if __name__ == "__main__":

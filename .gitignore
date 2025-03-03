@@ -1,5 +1,5 @@
 .env
-.txt
-.csv
+test_cases.txt
+test_cases.csv
 get_test_cases.ipynb
 draft.py

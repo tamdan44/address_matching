@@ -2,124 +2,198 @@ import requests
 import os
 import re
 import json
-from llm_utils import load_llm, get_llm_address
+from llm_utils import get_llm_address
+from unidecode import unidecode
 
+class AddressUtils:
+    def __init__(self, user_agent="YourApp/1.0", country_codes=['vn', 'ph', 'th']):
+        self.base_url = "https://nominatim.openstreetmap.org/search"
+        self.headers = {"User-Agent": user_agent}
+        self.country_codes = country_codes
 
-def get_osm_address(input_address):
-    """Lấy địa chỉ bằng API OpenStreetMap Nominatim."""
-    if isinstance(input_address, dict):
-        return input_address['error']
-    base_url = "https://nominatim.openstreetmap.org/search"
-    params = {
-        "q": input_address,
-        "format": "json",
-        "addressdetails": 1,
-        "limit": 1,
-    }
-
-    response = requests.get(base_url, params=params, headers={"User-Agent": "YourApp/1.0"})
-
-    if response.status_code == 200 and response.json():
-        data = response.json()[0]["address"]
-        country_codes = ['vn', 'ph', 'th']
-        print(data)
-        if data['country_code'] not in country_codes:
-            return None
-
-        structured_address = {
-            "amenity": data.get("amenity", data.get('neighbourhood', data.get('water', ""))),
-
-            "street": " ".join(filter(
-                None, [data.get("house_number", ""), data.get("road", data.get("street", ))]
-                )),
-
-            "ad4":  ", ".join(filter(
-                None, [data.get("hamlet", data.get('borough', "")), data.get("quarter", data.get("village", ""))]
-                )),
-
-            "ad3": data.get("town", data.get('ward', data.get('subdistrict', ""))),
-
-            "ad2": ", ".join(filter(
-                None, [data.get("region", data.get('suburb', "")), data.get("city_district", data.get("county", data.get("district", "")))]
-                )),
-            
-            "ad1": ", ".join(filter(
-                None, [data.get("city", ""), data.get("state", data.get("state_district", ""))]
-                )),
-            "country": data.get("country", "")
+    def get_osm_address(self, input_address):
+        """Lấy địa chỉ bằng API OpenStreetMap Nominatim."""
+        if isinstance(input_address, dict):
+            return input_address['error']
+        params = {
+            "q": input_address,
+            "format": "json",
+            "addressdetails": 1,
+            "limit": 1,
         }
-        return structured_address
-    return None
+
+        response = requests.get(self.base_url, params=params, headers=self.headers)
+
+        if response.status_code == 200 and response.json():
+            data = response.json()[0]["address"]
+            print(data)
+            if data['country_code'] not in self.country_codes:
+                return None
+
+            structured_address = {
+                "amenity": data.get("amenity", data.get('neighbourhood', data.get('tourism', ''))),
+
+                "street": " ".join(filter(
+                    None, [data.get("house_number", ""), data.get("road", data.get("street", "")), data.get("water", "")]
+                    )),
+
+                "ad4":  ", ".join(filter(
+                    None, [data.get("hamlet", data.get('borough', "")), data.get("quarter", data.get("village", ""))]
+                    )),
+
+                "ad3": data.get("town", data.get('ward', data.get('subdistrict', ""))),
+
+                "ad2": ", ".join(filter(
+                    None, [data.get("region", data.get('suburb', "")), data.get("city_district", data.get("county", data.get("district", "")))]
+                    )),
+                
+                "ad1": ", ".join(filter(
+                    None, [data.get("city", ""), data.get("state", data.get("state_district", ""))]
+                    )),
+                "country": data.get("country", "")
+            }
+            return structured_address
+        return None
 
 
-def format_address(structured_address, full=False):
-    if isinstance(structured_address, str):
-        return structured_address
-    filtered_items = {k: v for k, v in structured_address.items() if v!=''}
-    if full:
-        parts = [v for k, v in filtered_items.items() if k != "country_code"]
-    else:
-        parts = [v for k, v in filtered_items.items() if k not in ["amenity", "street", "country_code"]]
+    def format_address(self, structured_address: dict, full=False, drop=["amenity", "street", "country_code"]):
+        if isinstance(structured_address, str):
+            return structured_address
+        filtered_items = {k: v for k, v in structured_address.items() if v!=''}
+        return ", ".join([v for k, v in filtered_items.items() if full or k not in drop])
 
-    return ", ".join(parts)
-
-def is_deliverable(structured_address, check_one=False):
-    filtered_items = {k: v for k, v in structured_address.items() if v!=''}
-    if not check_one:
-        if (filtered_items.get('ad1', '')=='') and (filtered_items.get('ad2', '')=='' or filtered_items.get('ad3', '')==''):
+    def is_deliverable(self, structured_address: dict, hard_check=False):
+        """Check if address is deliverable."""
+        filtered_items = {k: v for k, v in structured_address.items() if v!=''}
+        keys = list(filtered_items.keys())
+        if len(keys) <=2 or (len(keys)<=4 and 'ad1' not in keys and 'ad2' not in keys and 'ad3' not in keys):
             return False
-    else:
-        if len(filtered_items) <=2 or ["amenity", "street", "country_code"] == list(filtered_items.keys()):
+        if hard_check and len(keys)<=4 and 'ad1' not in keys and 'ad2' not in keys and ('ad3' not in keys or 'ad4' not in keys):
             return False
-    return True
+        return True
 
-def get_output_address(llm, input_address):
-    """Trả về địa chỉ output, kết hợp OpenStreetMap và LLM."""
+    def is_madeup_address(self, llm_address, output_address):
+        """Check if llm_address is made up."""
+        llm_items_num = len({k: v for k, v in llm_address.items() if v!=''})
+        print('num', not output_address.get("amenity", "") == "")
+        print('num', llm_items_num<=5)
+        if llm_address.get("amenity", "") == "" and (not output_address.get("amenity", "") == "") and llm_items_num<=5:
+            return True
+        return False
 
-    input_address = " ".join(input_address.split())
+    def get_output_address(self, llm, input_address):
+        """Trả về địa chỉ output, kết hợp OpenStreetMap và LLM."""
 
-    # LLM
-    llm_address = get_llm_address(llm, input_address)
-    if not is_deliverable(llm_address, check_one=True):
-        return {'error': 'The address is not clear enough for delivery. Please add more details.', 'address': llm_address}
+        input_address = " ".join(input_address.split())
+        dropped = ["amenity", "street", "country_code"]
 
-    filtered_items = {k: v for k, v in llm_address.items() if v!=''}
-    print(format_address(llm_address))
+        # LLM
+        llm_address = get_llm_address(llm, input_address)
+        if not self.is_deliverable(llm_address):
+            return {'error': 'The address is not clear enough for delivery. Please add more details.'}
 
+        for replace_key in ["amenity", "street"]:
+            if len(llm_address.get(replace_key, "").split()) <=2 and llm_address.get("country_code", "") == 'vn':
+                llm_address["ad4"] = llm_address[replace_key] + ' ' + llm_address["ad4"]
+                llm_address[replace_key] = ""
+        print(llm_address)
 
-        # OpenStreetMap
-    osm_address = None
-    if len(filtered_items)<=3:
-        osm_address = get_osm_address(format_address(llm_address, full=True))
+        llm_items = {k: v for k, v in llm_address.items() if v!=''}
 
-    if not osm_address:
-        osm_address = get_osm_address(format_address(llm_address))
-
-    if not osm_address:
-        osm_address = get_osm_address(input_address)
-
-        if osm_address:
-            output_address = format_address(osm_address)
-                # if llm_address.get("street", '') != '':
-                #     output_address = llm_address['street'] + ', ' + output_address
-                # if llm_address.get("amenity", '') != '':
-                #     output_address = llm_address['amenity'] + ', ' + output_address
-
-            house_number = re.search(r'\b\d+[A-Za-z]?([\/-]\d+)*\b', input_address)
-            if house_number and house_number not in output_address:
-                output_address = house_number + ', ' + output_address
-            return {'address': output_address}
+            # OpenStreetMap
+        if len(llm_items)<=3:
+            print(1)
+            osm_address = self.get_osm_address(self.format_address(llm_address, full=True))
+            if self.is_madeup_address(llm_address, osm_address):
+                osm_address = None
+        else:
+            osm_address = None
             
-        return {'error': 'Address not found. Please try again.', 'address': osm_address}
+        if not osm_address:
+            print(2)
+            if not self.is_deliverable(llm_address, hard_check=True):
+                return {'error': 'Address not found. Please try again.'}
+            osm_address = self.get_osm_address(self.format_address(llm_address, drop=dropped)) 
+            if osm_address and self.is_madeup_address(llm_address, osm_address):
+                print('madeup')
+                osm_address = None
 
-    if not is_deliverable(osm_address):
-        return {'error': 'The address is not clear enough for delivery. Please add more details.', 'address': osm_address}
+        for drop_key in ["ad4", "ad3"]:
+            if not osm_address:
+                print(3)
+                dropped.append(drop_key)
+                osm_address = self.get_osm_address(self.format_address(llm_address, drop=dropped))
+                if osm_address and self.is_madeup_address(llm_address, osm_address):
+                    osm_address = None
+                else:
+                    break
 
-    # Kết hợp into output
-    output_address = ", ".join(filter(None, [
-        llm_address.get("amenity", ""),
-        llm_address.get("street", ""),
-        format_address(osm_address, full=True)
-    ]))
+        if not osm_address:
+            print(4)
+            osm_address = self.get_osm_address(input_address)
+            if osm_address and not self.is_madeup_address(llm_address, osm_address):
+                if self.is_madeup_address(llm_address, osm_address):
+                    return {'error': 'The address is not clear enough for delivery. Please add more details.'}
+                output_address = self.format_address(osm_address)
 
-    return output_address
+                house_number = re.search(r'\b\d+[A-Za-z]?([\/-]\d+)*\b', input_address)
+                if house_number and house_number not in output_address:
+                    output_address = house_number + ', ' + output_address
+                return {'address': output_address}
+            
+        if not osm_address:
+            return {'error': 'Address not found. Please try again.'}
+
+        # Kết hợp into output
+        output_address = ""
+        dropped.remove("country_code")
+        for x in dropped:
+            if x in llm_items:
+                output_address += llm_address.get(x, "").strip() + ", "
+        output_address += self.format_address(osm_address, full=True)
+
+        return {'address': output_address}
+
+    def get_id(self, structured_address: dict):
+        try:
+            with open('VietnamAdministrativeDivisions.json', 'r', encoding='utf_8') as file:
+                ad_dict = json.load(file)
+                address_components = list(structured_address.split(', '))
+        except Exception as e:
+            return None
+        
+        address_components = [x.strip() for x in address_components]
+        address_components.reverse()
+        if address_components[0] != 'Việt Nam':
+            return None 
+        if 'Huế' in address_components[1]:
+            address_components[1] = 'Thừa Thiên Huế'
+        location_list = ad_dict.get("provinces", None)
+
+        ads =["provinces", 'districts', 'wards']
+        ad = 0
+        id = None
+        name = []
+        for address_component in address_components:
+            index = self.find_index(location_list, address_component)
+            print(address_component)
+            if index is not None:
+                name.append(location_list[index]['name'])
+                id = location_list[index]['id']
+                ad+=1
+                try:
+                    location_list = location_list[index][ads[ad]]
+                except IndexError:
+                    break
+        return {'id': id, 'level': ads[ad-1], 'name': ', '.join(name)}
+
+    @staticmethod
+    def find_index(dict_list: list[dict], query: str):
+        """Tìm index của query trong list of dictionary."""
+        name_list = [x['name'] for x in dict_list]
+        query = query.strip()
+        for i, name in enumerate(name_list):
+            location = ' '.join(name.split()[-2:])
+            if unidecode(location).lower() in unidecode(query).lower():
+                return i
+        return None

@@ -18,11 +18,11 @@ All of the addresses belong to either Vietnam, Philipines or Thailand. The input
 
 ### Instruction:
 - The country_code are: "vn" for Vietnam, "ph" for the Philipines and "th" for Thailand.
-- ad1 (first-level aministrative devision) might include tỉnh, thành phố (trực thuộc trung ương), province, region, NCR, etc.
-- ad2 (second-level aministrative devision) might include quận, huyện, thành phố (trực thuộc tỉnh), thị xã, district, municipality, city, etc.
-- ad3 (second-level aministrative devision) might include phường, xã, thị trấn, subdistrict, ward, barangay, etc.
-- ad2 (second-level aministrative devision) might include thôn, ấp, làng, khu phố, village, community, zone, hamlet, etc. 
-
+- ad1 (first-level aministrative devision) might include tỉnh, thành phố trực thuộc trung ương (tp), province, region, NCR, etc.
+- ad2 (second-level aministrative devision) might include quận, huyện, thành phố trực thuộc tỉnh (tp), thị xã, district, municipality, city, etc.
+- ad3 (second-level aministrative devision) might include phường, xã, thị trấn (tt), subdistrict, ward, barangay, etc.
+- ad2 (second-level aministrative devision) might include thôn, ấp, làng, village, community, zone, hamlet, etc. 
+- street might include house numbers, street (st), đường, ngõ, hẻm, khu phố (kp), etc. 
 
 ### Example:
 - Input: 18a Nguyễn Văn Cừ, P. 4, Q. 5, TP. HCM
@@ -37,19 +37,19 @@ All of the addresses belong to either Vietnam, Philipines or Thailand. The input
 "country_code": "vn"
 }}
 
-- Input2: trường THCS Võ Thị Sáu Tổ 01 Xã Tà Năng Lâm Đồng
+- Input2: trường THCS Võ Thị Sáu Tổ 01 Thôn 5 Xã Tà Năng Lâm Đồng
 - Output2:
 {{
 "amenity": "Trường THCS Võ Thị Sáu",
 "street": "Tổ 01",
-"ad4": "",
+"ad4": "Thôn 5",
 "ad3": "Xã Tà Năng",
 "ad2": "",
 "ad1": "Lâm Đồng",
 "country_code": "vn"
 }}
 
-- Input3: Barangay San Isidro, General Santos City, South Cotabato
+- Input3: Brgy. San Isidro General Santos City South Cotabato
 - Output3:
 {{
 "amenity": "",
@@ -62,16 +62,16 @@ All of the addresses belong to either Vietnam, Philipines or Thailand. The input
 }}
 
 
-- Input4: Sản Hai1xa Phuo Định Huyện Thh
+- Input4: #8 Luzon St, Marina Baytown East Gate 2
 - Output4:
 {{
-"amenity": "Sản Hai1",
-"street": "",
+"amenity": "Marina Baytown East Gate 2",
+"street": "8 Luzon Street",
 "ad4": "",
-"ad3": "xa Phuo Định",
-"ad2": "Huyện Thh",
+"ad3": "",
+"ad2": "",
 "ad1": "",
-"country_code": "vn"
+"country_code": "ph"
 }}
 
 ### Input: {input_address}

@@ -28,12 +28,14 @@ ai_address = [matcher.get_output_address(llm, x) for x in customer_address]
 # process output
 new_address = [x.get('address', x.get('error', None)) if isinstance(x, dict) else None for x in ai_address]
 df['New AI'] = new_address
+structured_address = [x.get('structured_address', None) if isinstance(x, dict) else None for x in ai_address]
+df['Structured Address'] = structured_address
 
 
-ids = [matcher.get_address_id(new_address[x]) for x in range(len(new_address))]
+ids = [matcher.get_vn_address_id(new_address[x]) for x in range(len(new_address))]
 df['ID'] = ids
 
 # df = pd.DataFrame({'New AI': new_address, 'Error': error})
 
-df.to_csv('test_cases.csv', index=False)
+df.to_csv('test_cases.csv', index=True)
     

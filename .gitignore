@@ -1,5 +1,8 @@
 .env
+__pycache__/
+
 test_cases.txt
 test_cases.csv
+test_result.xlsx
 get_test_cases.ipynb
 draft.py

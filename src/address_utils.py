@@ -1,13 +1,16 @@
 import requests
-import os
 import re
-import json
-from llm_utils import get_llm_address
+from llm_openai import get_llm_address
 from unidecode import unidecode
+
+import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from configs import config
 
 class AddressMatcher:
     def __init__(self, user_agent="YourApp/1.0", country_codes=['vn', 'ph', 'th']):
-        self.base_url = "https://nominatim.openstreetmap.org/search"
+        self.base_url = config.DATABASE_URL
         self.headers = {"User-Agent": user_agent}
         self.country_codes = country_codes
 
@@ -75,7 +78,6 @@ class AddressMatcher:
     def is_madeup_address(self, llm_address, output_address):
         """Check if llm_address is made up."""
         llm_items_num = len({k: v for k, v in llm_address.items() if v!=''})
-        print('num', not output_address.get("amenity", "") == "")
         print('num', llm_items_num<=5)
         if llm_address.get("amenity", "") == "" and (not output_address.get("amenity", "") == "") and llm_items_num<=5:
             return True
@@ -102,7 +104,7 @@ class AddressMatcher:
 
         # OpenStreetMap
         osm_address, structured_address = self.get_osm_address(self.format_address(llm_address, drop=[]))
-        if self.is_madeup_address(llm_address, osm_address):
+        if osm_address and self.is_madeup_address(llm_address, osm_address):
             osm_address = None
             
         if not osm_address:
@@ -150,11 +152,9 @@ class AddressMatcher:
 
         return {'address': output_address, 'structured_address': structured_address}
 
-    def get_vn_address_id(self, structured_address: dict):
+    def get_vn_address_id(self, ad_dict, structured_address):
         try:
-            with open('VietnamAdministrativeDivisions.json', 'r', encoding='utf_8') as file:
-                ad_dict = json.load(file)
-                address_components = list(structured_address.split(', '))
+            address_components = list(structured_address.split(', '))
         except Exception as e:
             return None
         
@@ -186,6 +186,7 @@ class AddressMatcher:
     @staticmethod
     def find_index(dict_list: list[dict], query: str):
         """Tìm index của query trong list of dictionary."""
+        print(dict_list)
         name_list = [x['name'] for x in dict_list]
         query = query.strip()
         for i, name in enumerate(name_list):

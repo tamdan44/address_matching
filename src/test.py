@@ -1,12 +1,15 @@
 from address_utils import AddressMatcher
 import pandas as pd
-from dotenv import load_dotenv
-from llm_utils import load_llm
+from llm_openai import load_llm
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from configs import config
+
 
 matcher = AddressMatcher()
 # test cases 
-with open('test_cases.txt', 'r', encoding='utf_8') as file:
+with open(os.path.join('assets','test_cases.txt'), 'r', encoding='utf_8') as file:
     text = file.readlines()
 customer_address = [address.split('- Địa chỉ khách nhập: ')[1][:-1] for address in text if address.startswith('- Địa chỉ khách nhập: ')]
 true_address = [address.split('- Địa chỉ đơn hàng: ')[1][:-1] for address in text if address.startswith('- Địa chỉ đơn hàng: ')]
@@ -18,12 +21,11 @@ df = pd.DataFrame({'Old AI': old_ai, 'Customer Address': customer_address, 'True
 df.drop_duplicates()
 
 # call get_output_address
-load_dotenv()
-llm = load_llm(os.getenv("OPENAI_API_KEY"), 0, "gpt-4-turbo-preview")
+llm = load_llm(config.OPENAI_API_KEY, 0, "gpt-4-turbo-preview")
 
 ai_address = [matcher.get_output_address(llm, x) for x in customer_address]
 
-    # process output
+# process output
 new_address = [x.get('address', x.get('error', None)) if isinstance(x, dict) else None for x in ai_address]
 df['New AI'] = new_address
 

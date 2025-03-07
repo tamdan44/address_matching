@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from enum import Enum
 from typing import Optional
 import sys
@@ -20,9 +20,7 @@ class CountryEnum(str, Enum):
 # Request model
 class AddressInput(BaseModel):
     user_input: str
-    country_code: Optional[CountryEnum] = Field(
-        None, description="Optional. Allowed values: 'vn', 'th', 'ph', 'my', 'id'. Default is 'vn'."
-    )
+    country_code: Optional[CountryEnum] = None 
 
 # Endpoints
 @router.post("/get_address")

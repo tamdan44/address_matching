@@ -285,6 +285,7 @@ Ensure the output is a valid JSON object with:
             return None
         
         address_components.reverse()
+        address_components = [unidecode(x) for x in address_components]
 
         prov_dicts = AddressJSON().get_json(country_code)
         if isinstance(prov_dicts, dict):

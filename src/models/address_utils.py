@@ -1,7 +1,5 @@
 import requests
 import re
-import json
-from langchain.prompts import PromptTemplate
 from unidecode import unidecode
 
 import os
@@ -9,12 +7,21 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from configs import config
 from src.models.address_json import AddressJSON
+from src.models.llm_openai import LLMOpenAI
+from src.models.llm_google import LLMGoogle
 
 class AddressMatcher:
-    def __init__(self, user_agent="YourApp/1.0", country_codes=['vn', 'ph', 'th']):
+    def __init__(self, user_agent="AdressMatching/1.0", country_codes=['vn', 'ph', 'th', 'my', 'id'], llm_model="openai"):
         self.base_url = config.DATABASE_URL
         self.headers = {"User-Agent": user_agent}
         self.country_codes = country_codes
+        self.llm = self.load_llm(temp=0, model=llm_model)
+
+    def load_llm(self, temp, model):
+        if model == "openai":
+            return LLMOpenAI(config.OPENAI_API_KEY, temp=temp, model="gpt-4-turbo-preview")
+        elif model == "google":
+            return LLMGoogle(config.GOOGLE_API_KEY, temp=temp, model="gemini-1.5-pro")
 
     def get_osm_address(self, input_address):
         """Lấy địa chỉ bằng API OpenStreetMap Nominatim."""
@@ -36,14 +43,14 @@ class AddressMatcher:
                 return None, None
 
             address = {
-                "amenity": data.get("amenity", data.get('neighbourhood', data.get('tourism', data.get('historic', '')))),
+                "amenity": data.get("amenity", data.get('tourism', data.get('historic', ''))),
 
                 "street": " ".join(filter(
                     None, [data.get("house_number", ""), data.get("road", data.get("street", "")), data.get("water", "")]
                     )),
 
                 "ad4":  ", ".join(filter(
-                    None, [data.get("hamlet", data.get('borough', "")), data.get("quarter", data.get("village", ""))]
+                    None, [data.get("hamlet", data.get('borough', data.get('neighbourhood', ""))), data.get("quarter", data.get("village", ""))]
                     )),
 
                 "ad3": data.get("town", data.get('ward', data.get('subdistrict', ""))),
@@ -59,94 +66,6 @@ class AddressMatcher:
             }
             return address, data
         return None, None
-
-
-    def get_llm_address(self, llm, input_address: str):
-        """Uses LLM to extract structured address information."""
-        
-        prompt = PromptTemplate(
-            input_variables=["input_address"],
-            template='''You are an expert in address matching. Extract and return a JSON object with the address components.  
-All of the addresses belong to either Vietnam, Philipines or Thailand. The input address is usually in English or Vietnamese.
-
-### Instruction:
-- The country_code are: "vn" for Vietnam, "ph" for the Philipines and "th" for Thailand.
-- ad1 (first-level aministrative devision) might include tỉnh, thành phố trực thuộc trung ương (tp), province, region, NCR, etc.
-- ad2 (second-level aministrative devision) might include quận, huyện, thành phố trực thuộc tỉnh (tp), thị xã, district, municipality, city, etc.
-- ad3 (second-level aministrative devision) might include phường, xã, thị trấn (tt), subdistrict, ward, barangay, etc.
-- ad2 (second-level aministrative devision) might include thôn, ấp, làng, village, community, zone, hamlet, etc. 
-- street might include house numbers, street (st), đường, ngõ, hẻm, khu phố (kp), etc. 
-
-### Example:
-- Input: 18a Nguyễn Văn Cừ, P. 4, Q. 5, TP. HCM
-- Output:
-{{
-"amenity": "",
-"street": "18a Đường Nguyễn Văn Cừ",
-"ad4": "",
-"ad3": "Phường 4",
-"ad2": "Quận 5",
-"ad1": "Thành phố Hồ Chí Minh",
-"country_code": "vn"
-}}
-
-- Input2: trường THCS Võ Thị Sáu Tổ 01 Thôn 5 Xã Tà Năng Lâm Đồng
-- Output2:
-{{
-"amenity": "Trường THCS Võ Thị Sáu",
-"street": "Tổ 01",
-"ad4": "Thôn 5",
-"ad3": "Xã Tà Năng",
-"ad2": "",
-"ad1": "Lâm Đồng",
-"country_code": "vn"
-}}
-
-- Input3: Brgy. San Isidro General Santos City South Cotabato
-- Output3:
-{{
-"amenity": "",
-"street": "",
-"ad4": "",
-"ad3": "Barangay San Isidro",
-"ad2": "General Santos City, South Cotabato",
-"ad1": "",
-"country_code": "ph"
-}}
-
-- Input4: #8 Luzon St, Marina Baytown East Gate 2
-- Output4:
-{{
-"amenity": "Marina Baytown East Gate 2",
-"street": "8 Luzon Street",
-"ad4": "",
-"ad3": "",
-"ad2": "",
-"ad1": "",
-"country_code": "ph"
-}}
-
-### Input: {input_address}
-
-### Output:
-Ensure the output is a valid JSON object with:
-- "amenity"
-- "street"
-- "ad4"
-- "ad3"
-- "ad2"
-- "ad1"
-- "country_code"
-'''
-        )
-
-        response = llm(prompt.format(input_address=input_address))
-        
-        try:
-            address_data = json.loads(response.content.strip('```json\n').strip('```'))
-            return address_data
-        except json.JSONDecodeError:
-            return {"error": "Invalid JSON response from LLM"}
 
 
     def format_address(self, structured_address: dict, drop=["amenity", "street", "country_code"]):
@@ -173,14 +92,14 @@ Ensure the output is a valid JSON object with:
             return True
         return False
 
-    def get_output_address(self, llm, input_address):
+    def get_output_address(self, input_address):
         """Trả về địa chỉ output, kết hợp OpenStreetMap và LLM."""
 
         input_address = " ".join(input_address.split())
         dropped = ["amenity", "country_code"]
 
         # LLM
-        llm_address = self.get_llm_address(llm, input_address)
+        llm_address = self.llm.get_llm_address(input_address)
         if not self.is_deliverable(llm_address):
             return {'error': 'The address is not clear enough for delivery. Please add more details.'}
 
@@ -212,8 +131,9 @@ Ensure the output is a valid JSON object with:
                 dropped.append(drop_key)
                 osm_address, structured_address = self.get_osm_address(self.format_address(llm_address, drop=dropped))
                 if osm_address and self.is_madeup_address(llm_address, osm_address):
+                    print('madeup', osm_address)
                     osm_address = None
-                else:
+                elif osm_address:
                     break
 
         if not osm_address:

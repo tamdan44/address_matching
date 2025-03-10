@@ -1,11 +1,11 @@
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 import json
 from langchain.prompts import PromptTemplate
 
 
-class LLMOpenAI:
-    def __init__(self, api_key: str, temp: float, model: str) -> ChatOpenAI:
-        self.llm = ChatOpenAI(openai_api_key=api_key, temperature=temp, model=model)
+class LLMGoogle:
+    def __init__(self, api_key: str, temp: float, model: str) -> ChatGoogleGenerativeAI:
+        self.llm = ChatGoogleGenerativeAI(google_api_key=api_key, temperature=temp, model=model)
 
     def get_llm_address(self, input_address: str):
         """Uses LLM to extract structured address information."""
@@ -82,14 +82,13 @@ Ensure the output is a valid JSON object with:
 - "ad3"
 - "ad2"
 - "ad1"
-- "country_code"
-'''
+- "country_code"'''
         )
 
-        response = self.llm(prompt.format(input_address=input_address))
+        response = self.llm.invoke(prompt.format(input_address=input_address))
         
         try:
             address_data = json.loads(response.content.strip('```json\n').strip('```'))
             return address_data
         except json.JSONDecodeError:
-            return {"error": "Invalid JSON response from LLM"}
+            return response.content

@@ -17,16 +17,27 @@ class CountryEnum(str, Enum):
     my = "my"
     id = "id"
 
+# Model choices
+class ModelEnum(str, Enum):
+    openai = "openai"
+    google = "google"
+
 # Request model
 class AddressInput(BaseModel):
     user_input: str
+    model: Optional[ModelEnum] = None 
     country_code: Optional[CountryEnum] = None 
+
+# Initialize controller
+global_controller = AddressController()
 
 # Endpoints
 @router.post("/get_address")
 def get_address(input_data: AddressInput):
-    return AddressController.get_address(input_data.user_input)
+    global_controller.matcher.llm_model = input_data.model
+    return global_controller.get_address(input_data.user_input)
 
 @router.post("/get_address_id")
 def get_address_id(input_data: AddressInput):
-    return AddressController.get_address_id(input_data.user_input, input_data.country_code)
+    global_controller.matcher.llm_model = input_data.model
+    return global_controller.get_address_id(input_data.user_input, input_data.country_code)

@@ -10,7 +10,6 @@ from src.models.address_json import AddressJSON
 from src.models.llm_openai import LLMOpenAI
 from src.models.llm_google import LLMGoogle
 
-LLMGoogle(config.GOOGLE_API_KEY, temp=0, model="gemini-2.0-flash")
 
 class AddressMatcher:
     def __init__(self, user_agent="AdressMatching/1.0", country_codes=['vn', 'ph', 'th', 'my', 'id'], llm_model="openai"):

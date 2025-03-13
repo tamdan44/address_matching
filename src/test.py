@@ -1,17 +1,14 @@
 import pandas as pd
 import os
 import sys
+import ast
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from configs import config
 from src.models import AddressMatcher
 
 
+
 matcher = AddressMatcher()
-a = matcher.get_output_address("haixa long an vn")
-
-print(a)
-
-# matcher = AddressMatcher()
 # # test cases 
 # with open(os.path.join('assets','test_cases.txt'), 'r', encoding='utf_8') as file:
 #     text = file.readlines()
@@ -21,15 +18,19 @@ print(a)
 # old_ai = [address.split('- AI chọn địa chỉ: ')[1][:-1] for address in text if address.startswith('- AI chọn địa chỉ: ')]
 
 
-# # create dataframe
-# df = pd.DataFrame({'Old AI': old_ai, 'Customer Address': customer_address, 'True Address': true_address})
-# df.drop_duplicates(inplace=True)
-# old_ai = df['Old AI'].tolist()
-# customer_address = df['Customer Address'].tolist()
-# true_address = df['True Address'].tolist()
+# create dataframe
+df = pd.read_csv('test_cases.csv')
+df.drop_duplicates(inplace=True)
 
-# # call get_output_address
-# llm = load_llm(config.OPENAI_API_KEY, 0, "gpt-4-turbo-preview")
+structured_address = df['Structured Address'].tolist()
+structured_address = [ast.literal_eval(x) if isinstance(x, str) else None for x in structured_address]
+
+# old_ai = old_ai[len(df['Old AI']):]
+# customer_address = customer_address[len(df['Customer Address']):]
+# true_address = true_address[len(df['True Address']):]
+
+
+# call get_output_address
 
 # ai_address = [matcher.get_output_address(llm, x) for x in customer_address]
 
@@ -42,12 +43,12 @@ print(a)
 
 # df.to_csv('test_cases.csv', index=True)
 
+country_codes = [x.get('country_code', None) if isinstance(x, dict) else None for x in structured_address]
+print(set(country_codes))
+ids = [matcher.get_vn_address_id(structured_address[x]) if country_codes[x]=='vn' else matcher.get_foreign_address_id(structured_address[x], country_code=country_codes[x]) for x in range(len(country_codes))]
+df['ID'] = ids
+df = df[['Old AI', 'Customer Address', 'True Address', 'AI Address', 'Structured Address', 'ID']]
 
-# country_codes = [x.get('country_code', None) if isinstance(x, dict) else None for x in structured_address]
-# ids = [matcher.get_vn_address_id(structured_address[x]) if country_codes[x]=='vn' else matcher.get_foreign_address_id(structured_address[x], country_codes[x]) for x in range(len(new_address))]
-# df['ID'] = ids
 
-# # df = pd.DataFrame({'New AI': new_address, 'Error': error})
-
-# df.to_csv('test_cases.csv', index=True)
+df.to_csv('test_cases.csv', index=True)
     

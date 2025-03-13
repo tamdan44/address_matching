@@ -85,7 +85,6 @@ class AddressMatcher:
     def is_madeup_address(self, llm_address, output_address):
         """Check if llm_address is made up."""
         llm_items_num = len({k: v for k, v in llm_address.items() if v!=''})
-        print('num', llm_items_num<=5)
         if llm_address.get("amenity", "") == "" and (not output_address.get("amenity", "") == "") and llm_items_num<=5:
             return True
         return False
@@ -115,7 +114,6 @@ class AddressMatcher:
             osm_address = None
             
         if not osm_address:
-            print(2)
             if not self.is_deliverable(llm_address, hard_check=True):
                 return {'error': 'Address not found. Please try again.'}
             formatted_address = self.format_address(llm_address, drop=dropped)
@@ -125,17 +123,14 @@ class AddressMatcher:
 
         for drop_key in ["street", "ad4", "ad3"]:
             if not osm_address:
-                print(3)
                 dropped.append(drop_key)
                 osm_address, structured_address = self.get_osm_address(self.format_address(llm_address, drop=dropped))
                 if osm_address and self.is_madeup_address(llm_address, osm_address):
-                    print('madeup', osm_address)
                     osm_address = None
                 elif osm_address:
                     break
 
         if not osm_address:
-            print(4)
             osm_address, structured_address = self.get_osm_address(input_address)
             if osm_address and not self.is_madeup_address(llm_address, osm_address):
                 if self.is_madeup_address(llm_address, osm_address):
@@ -161,29 +156,27 @@ class AddressMatcher:
         return {'address': output_address, 'structured_address': structured_address}
 
     def get_vn_address_id(self, structured_address):
-        if isinstance(structured_address, dict) and structured_address.get('country_code', None) == 'vn':
-            structured_address.pop('country_code')
-            structured_address.pop('country')
-            address_components = list(structured_address.values())
-        else:
+        if not isinstance(structured_address, dict) or structured_address.get('country_code') != 'vn':
             return None
-        
-        address_components.reverse()
-        if 'Huế' in address_components[1]:
-            address_components[1] = 'Thừa Thiên Huế'
+        structured_address.pop('country_code')
+        structured_address.pop('country')
+        if structured_address.get('state', None) == 'Thành phố Huế':
+            structured_address['state'] = 'Thừa Thiên Huế'
 
-        vn_dict = AddressJSON().get_json('vn')
+        address_components = list(reversed(list(structured_address.values())))
+
+        assets = AddressJSON()
+        vn_dict = assets.get_json('vn')
+        ads = assets.get_ads('vn')
         if vn_dict.get('error', None):
             return vn_dict
         location_list = vn_dict.get("provinces", None)
 
-        ads =["provinces", 'districts', 'wards']
         ad = 0
         id = None
         name = []
         for address_component in address_components:
             index = self.find_index(location_list, address_component)
-            print(address_component)
             if index is not None:
                 name.append(location_list[index]['name'])
                 id = location_list[index]['id']
@@ -196,46 +189,72 @@ class AddressMatcher:
         return {'id': id, 'level': ads[ad-1], 'name': ' - '.join(name)}
 
     def get_foreign_address_id(self, structured_address, country_code='ph'):
-        if isinstance(structured_address, dict) and structured_address.get('country_code', None) == country_code:
-            structured_address.pop('country_code')
-            structured_address.pop('country')
-            address_components = list(structured_address.values())
-        else:
+        if not isinstance(structured_address, dict) or structured_address.get('country_code') != country_code:
             return None
-        
-        address_components.reverse()
-        address_components = [unidecode(x) for x in address_components]
+        structured_address.pop('country_code')
+        structured_address.pop('country')
+        if structured_address.get('city', None) == 'Lapu-Lapu':
+            structured_address['city'] = 'lapu lapu'
 
-        prov_dicts = AddressJSON().get_json(country_code)
+        address_components = list(reversed([unidecode(x.lower().replace("'","")) for x in structured_address.values()]))
+
+        assets = AddressJSON()
+        prov_dicts = assets.get_json(country_code)
+        ads = assets.get_ads(country_code)
         if isinstance(prov_dicts, dict):
             return prov_dicts
 
         count = 0
-        ids = {}
+        ad1 = ads[0]
+        ad2 = ads[1]
+        ad3 = ads[2]
+        ids, city_dicts, area_dicts, areas = {}, [], [], []
         for address_component in address_components:
-            if count==0:
-                city_dicts = [x for x in prov_dicts if address_component.lower() in x.get("provName", None).replace('-',' ').lower()]
-                if len(city_dicts)>0:
-                    count+=1
-                    ids["provId"] = city_dicts[0].get("provId", None)
-                    ids["provName"] = city_dicts[0].get("provName", None)
-                continue 
+            print(address_component)
 
-            if count==1:
-                area_dicts = [x for x in city_dicts if address_component.split(' ')[-1].lower() in x.get("cityName", None).replace('-',' ').lower()]
+            # match province
+            if city_dicts==[]:
+                city_dicts = self.find_areas(address_component, prov_dicts, ad1, split=False)
+
+                provs = list(set([x[ad1] for x in city_dicts]))
+                print(provs)
+                if len(provs)==1:
+                    ids[ad1] = provs[0]
+                    area_dicts, areas = [], []
+                    continue
+
+            # match city
+            if area_dicts==[]:
+                area_dicts = self.find_areas(address_component, city_dicts, ad2) 
+                if area_dicts==[]:
+                    area_dicts = self.find_areas(address_component, prov_dicts, ad2) 
+
                 if len(area_dicts)>0:
-                    count+=1
-                    ids["cityId"] = area_dicts[0].get("cityId", None)
-                    ids["cityName"] = area_dicts[0].get("cityName", None)
-                continue 
+                    ids[ad2] = area_dicts[0][ad2]
+                    if len(provs)>1:
+                        for prov in provs:
+                            area_dicts = self.find_areas(prov, area_dicts, ad1)
+                            if len(area_dicts)>0:
+                                ids[ad1] = prov
+                                continue
 
-            if count==2:
-                area = [x for x in area_dicts if address_component.split(' ')[-1].lower() in x.get("areaName", None).replace('-',' ').lower()]
-                if len(area)==1:
-                    return area[0]
-        if count>0:
-            return ids
-        return None
+
+            # match area
+            areas = self.find_areas(address_component, area_dicts, ad3)
+            if areas == []:
+                areas = self.find_areas(address_component, city_dicts, ad3)
+                print(2)
+                
+            if len(areas)==1:
+                print(3)
+                return areas[0]
+            elif len(areas)>1:
+                areas = self.find_areas(address_component, areas, ad3, split=False)
+                print(4, areas)
+                for area in areas:
+                    if area[ad1] == ids.get(ad1, None) or area[ad2] == ids.get(ad2, None):
+                        return area
+        return ids
 
     @staticmethod
     def find_index(dict_list: list[dict], query: str):
@@ -247,3 +266,24 @@ class AddressMatcher:
             if unidecode(location).lower() in unidecode(query).lower():
                 return i
         return None
+
+    @staticmethod
+    def find_areas(address_component: str, dicts: list[dict], level: str, split=True):
+        """Find areas that match the address component."""
+        if dicts == []:
+            return []
+        if split:
+            address_component_words = address_component.split(' ')
+        else:
+            address_component_words = [address_component.lower()]
+        areas = []
+        for word in address_component_words:
+            for area in dicts:
+                if word in area.get(level, "").replace('-',' ').lower():
+                    areas.append(area)
+            if len(areas)>0:
+                break
+            
+        return areas
+
+

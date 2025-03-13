@@ -104,7 +104,6 @@ class AddressMatcher:
             if len(llm_address.get(replace_key, "").split()) <=2 and llm_address.get("country_code", "") == 'vn':
                 llm_address["ad4"] = llm_address[replace_key] + ' ' + llm_address["ad4"]
                 llm_address[replace_key] = ""
-        print(llm_address)
 
         llm_items = {k: v for k, v in llm_address.items() if v!=''}
 
@@ -204,53 +203,44 @@ class AddressMatcher:
         if isinstance(prov_dicts, dict):
             return prov_dicts
 
-        count = 0
         ad1 = ads[0]
         ad2 = ads[1]
         ad3 = ads[2]
-        ids, city_dicts, area_dicts, areas = {}, [], [], []
+        ids, city_dicts, area_dicts = {}, [], []
         for address_component in address_components:
-            print(address_component)
 
             # match province
-            if city_dicts==[]:
+            if not city_dicts:
                 city_dicts = self.find_areas(address_component, prov_dicts, ad1, split=False)
 
-                provs = list(set([x[ad1] for x in city_dicts]))
-                print(provs)
+                provs = {x[ad1] for x in city_dicts}
                 if len(provs)==1:
-                    ids[ad1] = provs[0]
-                    area_dicts, areas = [], []
+                    ids[ad1] = provs.pop()
+                    area_dicts = []
                     continue
 
             # match city
-            if area_dicts==[]:
-                area_dicts = self.find_areas(address_component, city_dicts, ad2) 
-                if area_dicts==[]:
-                    area_dicts = self.find_areas(address_component, prov_dicts, ad2) 
+            if not area_dicts:
+                area_dicts = self.find_areas(address_component, city_dicts, ad2) or self.find_areas(address_component, prov_dicts, ad2) 
 
-                if len(area_dicts)>0:
+                if area_dicts:
                     ids[ad2] = area_dicts[0][ad2]
                     if len(provs)>1:
                         for prov in provs:
                             area_dicts = self.find_areas(prov, area_dicts, ad1)
-                            if len(area_dicts)>0:
+                            if area_dicts:
                                 ids[ad1] = prov
-                                continue
+                                break
+                    continue
 
 
             # match area
-            areas = self.find_areas(address_component, area_dicts, ad3)
-            if areas == []:
-                areas = self.find_areas(address_component, city_dicts, ad3)
-                print(2)
+            areas = self.find_areas(address_component, area_dicts, ad3) or self.find_areas(address_component, city_dicts, ad3)
                 
             if len(areas)==1:
-                print(3)
                 return areas[0]
-            elif len(areas)>1:
+            elif areas:
                 areas = self.find_areas(address_component, areas, ad3, split=False)
-                print(4, areas)
                 for area in areas:
                     if area[ad1] == ids.get(ad1, None) or area[ad2] == ids.get(ad2, None):
                         return area
@@ -272,18 +262,14 @@ class AddressMatcher:
         """Find areas that match the address component."""
         if dicts == []:
             return []
-        if split:
-            address_component_words = address_component.split(' ')
-        else:
-            address_component_words = [address_component.lower()]
+        
+        address_component_words = address_component.split(' ') if split else [address_component.lower()]
         areas = []
         for word in address_component_words:
-            for area in dicts:
-                if word in area.get(level, "").replace('-',' ').lower():
-                    areas.append(area)
-            if len(areas)>0:
-                break
+            areas = [area for area in dicts if word in area.get(level, "").replace('-', ' ').lower()]
+            if areas:
+                return areas 
             
-        return areas
+        return []
 
 

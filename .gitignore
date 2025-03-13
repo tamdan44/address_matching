@@ -1,8 +1,10 @@
 .env
 __pycache__/
 
+test.py
+draft.py
+
 test_cases.txt
 test_cases.csv
 test_result.xlsx
 aaa.ipynb
-draft.py

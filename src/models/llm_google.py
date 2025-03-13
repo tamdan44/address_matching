@@ -13,10 +13,10 @@ class LLMGoogle:
         prompt = PromptTemplate(
             input_variables=["input_address"],
             template='''You are an expert in address matching. Extract and return a JSON object with the address components.  
-All of the addresses belong to either Vietnam, Philipines or Thailand. The input address is usually in English or Vietnamese.
+All of the addresses belong to one of the Southeast Asian countries. The input address is usually in English or Vietnamese.
 
 ### Instruction:
-- The country_code are: "vn" for Vietnam, "ph" for the Philipines and "th" for Thailand.
+- The country_code are: {{"Vietnam": "vn", "Philipines": "ph", "Thailand": "th", "Indonesia": "id", "Malaysia": "my"}}.
 - ad1 (first-level aministrative devision) might include tỉnh, thành phố trực thuộc trung ương (tp), province, region, NCR, etc.
 - ad2 (second-level aministrative devision) might include quận, huyện, thành phố trực thuộc tỉnh (tp), thị xã, district, municipality, city, etc.
 - ad3 (second-level aministrative devision) might include phường, xã, thị trấn (tt), subdistrict, ward, barangay, etc.

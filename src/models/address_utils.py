@@ -12,17 +12,14 @@ from src.models.llm_google import LLMGoogle
 
 
 class AddressMatcher:
-    def __init__(self, user_agent="AdressMatching/1.0", country_codes=['vn', 'ph', 'th', 'my', 'id'], llm_model="openai"):
+    def __init__(self, user_agent="AdressMatching/1.0", country_codes=['vn', 'ph', 'th', 'my', 'id']):
         self.base_url = config.DATABASE_URL
         self.headers = {"User-Agent": user_agent}
         self.country_codes = country_codes
-        self.llm = self.load_llm(temp=0, model=llm_model)
+        self.llm = self.load_llm(temp=0)
 
-    def load_llm(self, temp, model):
-        if model == "openai":
-            return LLMOpenAI(config.OPENAI_API_KEY, temp=temp, model="gpt-4o-mini") #0.00015
-        elif model == "google":
-            return LLMGoogle(config.GOOGLE_API_KEY, temp=temp, model="gemini-2.0-flash") #0.00001
+    def load_llm(self, temp):
+        return LLMGoogle(config.GOOGLE_API_KEY, temp=temp, model="gemini-2.0-flash") #0.00001
 
     def get_osm_address(self, input_address):
         """Lấy địa chỉ bằng API OpenStreetMap Nominatim."""
@@ -195,7 +192,8 @@ class AddressMatcher:
                     location_list = location_list[index][ads[ad]]
                 except IndexError:
                     break
-        return {'id': id, 'level': ads[ad-1], 'name': ', '.join(name)}
+        name.reverse()
+        return {'id': id, 'level': ads[ad-1], 'name': ' - '.join(name)}
 
     def get_foreign_address_id(self, structured_address, country_code='ph'):
         if isinstance(structured_address, dict) and structured_address.get('country_code', None) == country_code:

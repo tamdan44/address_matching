@@ -6,10 +6,10 @@ from configs import config
 from src.models import AddressMatcher
 
 
-matcher = AddressMatcher(llm_model="google")
-matcher.get_output_address("123 Đường Lê Lai, Phường Bến Thành, Quận 1, TP Hồ Chí Minh, Việt Nam")
+matcher = AddressMatcher()
+a = matcher.get_output_address("haixa long an vn")
 
-
+print(a)
 
 # matcher = AddressMatcher()
 # # test cases 
